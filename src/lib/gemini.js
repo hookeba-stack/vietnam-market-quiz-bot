@@ -52,7 +52,7 @@ Yêu cầu cho mỗi câu hỏi trắc nghiệm:
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash', // gemini-1.5-flash is perfect for cost-efficiency and fast structured output
+      model: 'gemini-2.0-flash', // gemini-2.0-flash works with @google/genai SDK v2 (v1beta API)
       contents: contents,
       config: {
         responseMimeType: 'application/json',
