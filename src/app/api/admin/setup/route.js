@@ -9,9 +9,11 @@ export async function GET(request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  // Strip BOM character (\uFEFF) that PowerShell may add to env vars
+  const serviceRoleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').replace(/^\uFEFF/, '');
   const supabase = createClient(
     process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
+    serviceRoleKey
   );
 
   const results = [];
@@ -36,10 +38,11 @@ export async function GET(request) {
     }
   }
 
-  if (missing.length === 0) {
+  const hasErrors = results.some(r => r.status.startsWith('ERROR'));
+  if (missing.length === 0 && !hasErrors) {
     return NextResponse.json({
       success: true,
-      message: 'Tất cả 5 tables đã tồn tại!',
+      message: 'Tất cả 5 tables đã tồn tại và hoạt động bình thường! ✅',
       results
     });
   }
