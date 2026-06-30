@@ -1,0 +1,15 @@
+name: Hourly Zalo Quiz Cron
+
+on:
+  schedule:
+    - cron: '0 * * * *' # Runs at the start of every hour (UTC)
+  workflow_dispatch: # Allows manual trigger from the GitHub Actions tab
+
+jobs:
+  trigger-send-quiz:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Send Quiz Endpoint
+        run: |
+          curl -s -X GET "https://vietnam-market-quiz-bot.vercel.app/api/cron/send-quiz" \
+            -H "Authorization: Bearer vietnam_market_quiz_bot_cron_secret_key_2026"
