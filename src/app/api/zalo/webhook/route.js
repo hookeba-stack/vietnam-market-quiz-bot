@@ -65,22 +65,24 @@ export async function POST(request) {
 
         console.log(`Processing question-number submission. Question Number: ${questionNum}, Selected: ${selectedOption}`);
 
-        // Fetch all sent quizzes for this chat_id from delivery_logs joined with quizzes
+        // Fetch all sent quizzes for this chat_id from delivery_logs joined with quizzes, sorted by sent_at desc
         const { data: sentQuizzes, error: sentError } = await supabase
           .from('delivery_logs')
           .select(`
             quiz_id,
+            sent_at,
             quizzes (
               id,
               question
             )
           `)
           .eq('chat_id', chatId)
-          .eq('status', 'success');
+          .eq('status', 'success')
+          .order('sent_at', { ascending: false });
 
         if (sentError) throw sentError;
 
-        // Find the quiz that has "[Câu hỏi X]" or "Câu hỏi X" matching questionNum
+        // Find the most recently sent quiz that has "[Câu hỏi X]" matching questionNum
         const matchedSent = sentQuizzes?.find(s => {
           const qText = s.quizzes?.question || '';
           const matchNum = qText.match(/(?:Câu hỏi|Câu)\s*(\d+)/i);
@@ -129,30 +131,47 @@ export async function POST(request) {
 
           console.log(`Processing reply-to-message question number. Question Number: ${questionNum}, Selected: ${selectedOption}`);
 
-          // Fetch all sent quizzes for this chat_id from delivery_logs joined with quizzes
+          // Fetch all sent quizzes for this chat_id from delivery_logs joined with quizzes, sorted by sent_at desc
           const { data: sentQuizzes, error: sentError } = await supabase
             .from('delivery_logs')
             .select(`
               quiz_id,
+              sent_at,
               quizzes (
                 id,
                 question
               )
             `)
             .eq('chat_id', chatId)
-            .eq('status', 'success');
+            .eq('status', 'success')
+            .order('sent_at', { ascending: false });
 
           if (sentError) throw sentError;
 
-          // Find the quiz that has "[Câu hỏi X]" or "Câu hỏi X" matching questionNum
-          const matchedSent = sentQuizzes?.find(s => {
+          // Find candidate quizzes matching the question number
+          const matchedCandidates = sentQuizzes?.filter(s => {
             const qText = s.quizzes?.question || '';
             const matchNum = qText.match(/(?:Câu hỏi|Câu)\s*(\d+)/i);
             return matchNum && parseInt(matchNum[1]) === questionNum;
-          });
+          }) || [];
 
-          if (matchedSent) {
-            quizId = matchedSent.quiz_id;
+          if (matchedCandidates.length === 1) {
+            quizId = matchedCandidates[0].quiz_id;
+          } else if (matchedCandidates.length > 1) {
+            // Find the candidate whose question text matches a substring of the quoted message
+            const matched = matchedCandidates.find(c => {
+              const qText = c.quizzes?.question || '';
+              const cleanQ = qText.replace(/^\[Câu hỏi \d+\]\s*/i, '').trim();
+              const sampleText = cleanQ.substring(0, 30);
+              return quoteText.includes(sampleText);
+            });
+            
+            if (matched) {
+              quizId = matched.quiz_id;
+            } else {
+              // Fallback to the most recently sent candidate
+              quizId = matchedCandidates[0].quiz_id;
+            }
           } else {
             await sendZaloMessage(chatId, `⚠️ Không tìm thấy câu hỏi số ${questionNum} trong danh sách câu hỏi đã gửi từ tin nhắn trích dẫn.`);
             return NextResponse.json({ ok: true });
