@@ -37,19 +37,29 @@ async function sendAllQuizzes() {
 
     if (quizError) throw quizError;
 
-    if (!quizzes || quizzes.length === 0) {
-      console.log("❌ Không tìm thấy câu hỏi nào trong CSDL. Vui lòng đồng bộ Google Drive trước.");
-      return;
-    }
+    // 1.5. Fetch already sent quizzes for this chat ID
+    const { data: sentLogs, error: logError } = await supabase
+      .from('delivery_logs')
+      .select('quiz_id')
+      .eq('chat_id', chatId)
+      .eq('status', 'success');
 
-    console.log(`Tìm thấy ${quizzes.length} câu hỏi. Đang tiến hành gửi 20 câu...`);
+    if (logError) throw logError;
+
+    const sentQuizIds = new Set(sentLogs.map(l => l.quiz_id));
+    const unsentQuizzes = quizzes.filter(q => !sentQuizIds.has(q.id));
+
+    console.log(`Tìm thấy ${quizzes.length} câu hỏi tổng cộng. Đã gửi ${sentQuizIds.size} câu. Còn lại ${unsentQuizzes.length} câu chưa gửi.`);
+
+    const quizzesToProcess = unsentQuizzes.length > 0 ? unsentQuizzes : quizzes;
+    console.log(`Tiến hành gửi ${Math.min(20, quizzesToProcess.length)} câu mới...`);
 
     let successCount = 0;
     let failedCount = 0;
 
-    const limit = Math.min(20, quizzes.length);
+    const limit = Math.min(20, quizzesToProcess.length);
     for (let i = 0; i < limit; i++) {
-      const quiz = quizzes[i];
+      const quiz = quizzesToProcess[i];
       
       const formattedText = `${quiz.source_file ? `📖 Nguồn: ${cleanSourceFile(quiz.source_file)}\n\n` : ''}❓ Câu hỏi: ${quiz.question}
 
