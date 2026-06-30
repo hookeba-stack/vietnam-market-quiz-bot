@@ -8,6 +8,15 @@ function getBotToken() {
   return token;
 }
 
+export function cleanSourceFile(filename) {
+  if (!filename) return '';
+  return filename
+    .replace(/\.pdf$/i, '')
+    .replace(/^copy\s+of\s+/i, '')
+    .replace(/\s+shared\s+by\s+.*$/i, '')
+    .trim();
+}
+
 /**
  * Sends a raw text message to a Zalo chat_id
  * @param {string} chatId - Target chat ID (user or group)
@@ -54,20 +63,9 @@ export async function sendZaloMessage(chatId, text) {
  * @param {string} webappUrl - Base URL of our Webapp for links
  */
 export async function sendQuizToZalo(chatId, quiz, webappUrl = '') {
-  // Convert UUID or ID to a shorter reference if needed, or use first 6 chars
-  const shortId = quiz.id ? quiz.id.substring(0, 8) : 'TEMP';
-  
-  const formattedText = `📝 HỌC TẬP THỊ TRƯỜNG CÙNG BOT 📝
-📌 Chủ đề: ${quiz.topic}
-${quiz.source_file ? `📖 Nguồn: ${quiz.source_file.replace('.pdf', '')}` : ''}
+  const formattedText = `${quiz.source_file ? `📖 Nguồn: ${cleanSourceFile(quiz.source_file)}\n\n` : ''}❓ Câu hỏi: ${quiz.question}
 
-❓ Câu hỏi: ${quiz.question}
-
-${quiz.options.join('\n')}
-
-💡 Hướng dẫn trả lời:
-👉 Soạn cú pháp: Q_${shortId} [Đáp án] (Ví dụ: Q_${shortId} A) gửi trực tiếp cho Bot này.
-👉 Hoặc xem bảng thống kê & đáp án tại Webapp: ${webappUrl}/quiz`;
+${quiz.options.join('\n')}`;
 
   return sendZaloMessage(chatId, formattedText);
 }

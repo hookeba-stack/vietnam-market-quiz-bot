@@ -97,6 +97,7 @@ export async function POST(request) {
         // 3. Check if the message is a REPLY (quoting) to a quiz message
         const quoteText = body.message?.quote_message?.text || '';
         const quoteMatch = quoteText.match(/Q_([a-f0-9]{8})/i);
+        const quoteNumMatch = quoteText.match(/(?:Câu hỏi|Câu)\s*(\d+)/i);
         
         const optionOnlyRegex = /^\s*([A-D])\.?\s*$/i;
         const optionMatch = messageText.trim().match(optionOnlyRegex);
@@ -120,6 +121,40 @@ export async function POST(request) {
             quizId = matchedQuiz.id;
           } else {
             await sendZaloMessage(chatId, `⚠️ Không tìm thấy mã câu hỏi Q_${quizShortId} trên hệ thống từ tin nhắn trích dẫn.`);
+            return NextResponse.json({ ok: true });
+          }
+        } else if (quoteNumMatch && optionMatch) {
+          const questionNum = parseInt(quoteNumMatch[1]);
+          selectedOption = optionMatch[1].toUpperCase();
+
+          console.log(`Processing reply-to-message question number. Question Number: ${questionNum}, Selected: ${selectedOption}`);
+
+          // Fetch all sent quizzes for this chat_id from delivery_logs joined with quizzes
+          const { data: sentQuizzes, error: sentError } = await supabase
+            .from('delivery_logs')
+            .select(`
+              quiz_id,
+              quizzes (
+                id,
+                question
+              )
+            `)
+            .eq('chat_id', chatId)
+            .eq('status', 'success');
+
+          if (sentError) throw sentError;
+
+          // Find the quiz that has "[Câu hỏi X]" or "Câu hỏi X" matching questionNum
+          const matchedSent = sentQuizzes?.find(s => {
+            const qText = s.quizzes?.question || '';
+            const matchNum = qText.match(/(?:Câu hỏi|Câu)\s*(\d+)/i);
+            return matchNum && parseInt(matchNum[1]) === questionNum;
+          });
+
+          if (matchedSent) {
+            quizId = matchedSent.quiz_id;
+          } else {
+            await sendZaloMessage(chatId, `⚠️ Không tìm thấy câu hỏi số ${questionNum} trong danh sách câu hỏi đã gửi từ tin nhắn trích dẫn.`);
             return NextResponse.json({ ok: true });
           }
         } else if (optionMatch) {
