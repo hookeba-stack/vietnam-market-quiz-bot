@@ -212,7 +212,7 @@ export default function SchedulePage() {
             <div style={{ marginTop: '20px', background: 'rgba(59, 130, 246, 0.04)', padding: '16px', borderRadius: 'var(--border-radius-sm)', border: '1px solid rgba(59, 130, 246, 0.1)' }}>
               <p style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>📌 Hướng dẫn lấy Chat ID:</p>
               <ul style={{ fontSize: '0.75rem', color: 'var(--text-muted)', paddingLeft: '16px', lineHeight: '1.5' }}>
-                <li><b>Cá nhân:</b> Chat ID chính là ID tài khoản người dùng Zalo chat với bot.</li>
+                <li><b>Cá nhân:</b> Chat ID là chuỗi định danh do Zalo cấp cho Bot (ví dụ: <code>adf8d5c8608589dbd094</code>), <b>không phải</b> số điện thoại hay ID số của tài khoản Zalo cá nhân. Bạn có thể tìm thấy ID này trong phần <b>Nhật ký & Lịch sử</b> &gt; tab <b>Lịch sử tương tác người dùng</b> sau khi bạn nhắn tin cho Bot.</li>
                 <li><b>Nhóm:</b> Thêm bot vào nhóm, khi bot nhận được tin nhắn, Chat ID nhóm sẽ hiển thị trong phần <b>Nhật ký</b> của Dashboard. Bạn có thể copy ID đó để dán vào đây.</li>
               </ul>
             </div>
