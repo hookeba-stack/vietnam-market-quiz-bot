@@ -19,35 +19,143 @@ export async function POST(request) {
     //   "chat_id": "987654321"
     // }
     const messageText = body.message?.text || '';
-    const userId = body.sender?.id || '';
-    const userName = body.sender?.display_name || 'Người dùng Zalo';
-    const chatId = body.chat_id || userId; // fallback to userId if chatId is missing
+    const userId = body.message?.from?.id || body.sender?.id || '';
+    const userName = body.message?.from?.display_name || body.sender?.display_name || 'Người dùng Zalo';
+    const chatId = body.message?.chat?.id || body.chat_id || userId; // fallback
 
     if (!messageText || !chatId) {
       return NextResponse.json({ ok: true, status: 'ignored_missing_data' });
     }
 
+    let quizId = null;
+    let selectedOption = null;
+
     // 1. Regex to check if the message is an answer submission (e.g. Q_a8f9c1d2 A)
-    // Accept lowercase/uppercase and potential trailing whitespaces
     const quizAnswerRegex = /^Q_([a-f0-9]{8})\s+([A-D])$/i;
     const match = messageText.trim().match(quizAnswerRegex);
 
     if (match) {
       const quizShortId = match[1].toLowerCase();
-      const selectedOption = match[2].toUpperCase();
+      selectedOption = match[2].toUpperCase();
 
       console.log(`Processing answer submission. Quiz Short ID: ${quizShortId}, Selected: ${selectedOption}`);
 
-      // a. Find the quiz in Supabase (look for id starting with quizShortId)
+      // a. Find the quiz in Supabase by matching short ID
+      const { data: quizList, error: listError } = await supabase
+        .from('quizzes')
+        .select('id');
+
+      if (listError) throw listError;
+
+      const matchedQuiz = quizList?.find(q => q.id.substring(0, 8) === quizShortId);
+
+      if (!matchedQuiz) {
+        await sendZaloMessage(chatId, `⚠️ Không tìm thấy mã câu hỏi Q_${quizShortId} trên hệ thống. Vui lòng kiểm tra lại.`);
+        return NextResponse.json({ ok: true });
+      }
+      quizId = matchedQuiz.id;
+    } else {
+      // 2. Check if it matches question number based format (e.g. 2B, Câu 2 B, q2 B)
+      const numberAnswerRegex = /^\s*(?:câu|cau|q)?\s*(\d+)\s*[:.-]?\s*([A-D])\s*$/i;
+      const numMatch = messageText.trim().match(numberAnswerRegex);
+
+      if (numMatch) {
+        const questionNum = parseInt(numMatch[1]);
+        selectedOption = numMatch[2].toUpperCase();
+
+        console.log(`Processing question-number submission. Question Number: ${questionNum}, Selected: ${selectedOption}`);
+
+        // Fetch all sent quizzes for this chat_id from delivery_logs joined with quizzes
+        const { data: sentQuizzes, error: sentError } = await supabase
+          .from('delivery_logs')
+          .select(`
+            quiz_id,
+            quizzes (
+              id,
+              question
+            )
+          `)
+          .eq('chat_id', chatId)
+          .eq('status', 'success');
+
+        if (sentError) throw sentError;
+
+        // Find the quiz that has "[Câu hỏi X]" or "Câu hỏi X" matching questionNum
+        const matchedSent = sentQuizzes?.find(s => {
+          const qText = s.quizzes?.question || '';
+          const matchNum = qText.match(/(?:Câu hỏi|Câu)\s*(\d+)/i);
+          return matchNum && parseInt(matchNum[1]) === questionNum;
+        });
+
+        if (matchedSent) {
+          quizId = matchedSent.quiz_id;
+        } else {
+          await sendZaloMessage(chatId, `⚠️ Không tìm thấy câu hỏi số ${questionNum} trong danh sách câu hỏi đã gửi cho bạn.`);
+          return NextResponse.json({ ok: true });
+        }
+      } else {
+        // 3. Check if the message is a REPLY (quoting) to a quiz message
+        const quoteText = body.message?.quote_message?.text || '';
+        const quoteMatch = quoteText.match(/Q_([a-f0-9]{8})/i);
+        
+        const optionOnlyRegex = /^\s*([A-D])\.?\s*$/i;
+        const optionMatch = messageText.trim().match(optionOnlyRegex);
+
+        if (quoteMatch && optionMatch) {
+          const quizShortId = quoteMatch[1].toLowerCase();
+          selectedOption = optionMatch[1].toUpperCase();
+
+          console.log(`Processing reply-to-message submission. Quiz Short ID from quote: ${quizShortId}, Selected: ${selectedOption}`);
+
+          // Find the quiz in Supabase by matching short ID
+          const { data: quizList, error: listError } = await supabase
+            .from('quizzes')
+            .select('id');
+
+          if (listError) throw listError;
+
+          const matchedQuiz = quizList?.find(q => q.id.substring(0, 8) === quizShortId);
+
+          if (matchedQuiz) {
+            quizId = matchedQuiz.id;
+          } else {
+            await sendZaloMessage(chatId, `⚠️ Không tìm thấy mã câu hỏi Q_${quizShortId} trên hệ thống từ tin nhắn trích dẫn.`);
+            return NextResponse.json({ ok: true });
+          }
+        } else if (optionMatch) {
+          // 4. Fallback: If it's just a letter but not a reply, check the last successfully sent quiz to this chat_id
+          selectedOption = optionMatch[1].toUpperCase();
+          console.log(`Processing fallback single-option submission. Selected: ${selectedOption}`);
+
+          const { data: lastDelivery, error: delError } = await supabase
+            .from('delivery_logs')
+            .select('quiz_id')
+            .eq('chat_id', chatId)
+            .eq('status', 'success')
+            .order('sent_at', { ascending: false })
+            .limit(1);
+
+          if (delError) throw delError;
+
+          if (lastDelivery && lastDelivery.length > 0) {
+            quizId = lastDelivery[0].quiz_id;
+          } else {
+            await sendZaloMessage(chatId, `⚠️ Bạn chưa nhận được câu hỏi nào từ hệ thống để trả lời.`);
+            return NextResponse.json({ ok: true });
+          }
+        }
+      }
+    }
+
+    if (quizId && selectedOption) {
       const { data: quizzes, error: queryError } = await supabase
         .from('quizzes')
         .select('*')
-        .like('id', `${quizShortId}%`);
+        .eq('id', quizId);
 
       if (queryError) throw queryError;
-
-      if (quizzes.length === 0) {
-        await sendZaloMessage(chatId, `⚠️ Không tìm thấy mã câu hỏi Q_${quizShortId} trên hệ thống. Vui lòng kiểm tra lại.`);
+      if (!quizzes || quizzes.length === 0) {
+        await sendZaloMessage(chatId, `⚠️ Không tìm thấy thông tin câu hỏi trên hệ thống.`);
         return NextResponse.json({ ok: true });
       }
 
@@ -89,7 +197,6 @@ export async function POST(request) {
 
       // d. Send reply back to Zalo
       await sendZaloMessage(chatId, replyText);
-
     } else {
       // 2. If message does not match answer format, send guidance/welcome instructions
       // Prevent bot from replying in loops if it's reacting to its own messages (usually Webhooks only receive user messages)

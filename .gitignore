@@ -42,3 +42,5 @@ next-env.d.ts
 
 .vercel
 .env*
+credentials.json
+scripts/test-gemini-key.js

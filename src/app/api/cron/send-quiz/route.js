@@ -6,9 +6,16 @@ import { sendQuizToZalo } from '@/lib/zalo';
 export async function GET(request) {
   // 1. Authorization Check (for Vercel Cron protection)
   const authHeader = request.headers.get('authorization');
+  const referer = request.headers.get('referer');
+  const host = request.headers.get('host');
   const isCronSecretConfigured = !!process.env.CRON_SECRET;
   
-  if (isCronSecretConfigured && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const isSameOrigin = referer && host && (
+    referer.startsWith(`http://${host}`) || 
+    referer.startsWith(`https://${host}`)
+  );
+
+  if (isCronSecretConfigured && authHeader !== `Bearer ${process.env.CRON_SECRET}` && !isSameOrigin) {
     if (process.env.NODE_ENV !== 'development') {
       return new Response('Unauthorized', { status: 401 });
     }
@@ -22,18 +29,25 @@ export async function GET(request) {
     const webappUrl = process.env.NEXT_PUBLIC_WEBAPP_URL || 'https://quiz-market-zalo.vercel.app';
     console.log("Cron send-quiz: Checking for active schedules...");
 
-    // 2. Get active schedules
-    const { data: schedules, error: schedError } = await supabase
-      .from('schedules')
-      .select('*')
-      .eq('is_active', true);
+    // Get force parameter for testing
+    const { searchParams } = new URL(request.url);
+    const force = searchParams.get('force') === 'true';
+
+    // 2. Get active schedules (filter by next_send_at unless force=true)
+    let query = supabase.from('schedules').select('*').eq('is_active', true);
+    if (!force) {
+      const nowStr = new Date().toISOString();
+      query = query.lte('next_send_at', nowStr);
+    }
+    
+    const { data: schedules, error: schedError } = await query;
 
     if (schedError) throw schedError;
 
     if (schedules.length === 0) {
       return NextResponse.json({
         success: true,
-        message: "No active quiz schedules found."
+        message: "No active quiz schedules due at this time."
       });
     }
 
@@ -43,11 +57,24 @@ export async function GET(request) {
     for (const schedule of schedules) {
       console.log(`Processing schedule for Chat ID: ${schedule.chat_id}, Topic: ${schedule.topic}`);
 
-      // a. Get all quizzes for this topic
-      const { data: quizzes, error: quizError } = await supabase
-        .from('quizzes')
-        .select('*')
-        .eq('topic', schedule.topic);
+      // a. Get quizzes for this topic (or all quizzes if random)
+      let quizzes = [];
+      let quizError = null;
+
+      if (schedule.topic === '__random__') {
+        const { data, error } = await supabase
+          .from('quizzes')
+          .select('*');
+        quizzes = data || [];
+        quizError = error;
+      } else {
+        const { data, error } = await supabase
+          .from('quizzes')
+          .select('*')
+          .eq('topic', schedule.topic);
+        quizzes = data || [];
+        quizError = error;
+      }
 
       if (quizError) {
         console.error(`Error fetching quizzes for topic ${schedule.topic}:`, quizError.message);
@@ -76,7 +103,7 @@ export async function GET(request) {
       // c. Find the first quiz that hasn't been sent yet
       let quizToSend = quizzes.find(q => !sentQuizIds.has(q.id));
 
-      // Fallback: If all quizzes for this topic have been sent, reset and pick the oldest or a random one
+      // Fallback: If all quizzes have been sent, pick a random one
       if (!quizToSend) {
         console.log(`All quizzes sent for topic ${schedule.topic} to chat ${schedule.chat_id}. Re-sending a random one.`);
         quizToSend = quizzes[Math.floor(Math.random() * quizzes.length)];
@@ -104,9 +131,31 @@ export async function GET(request) {
       }
 
       // f. Update schedule last_sent_at and calculate next_send_at
-      // Standard setup: Next send is in 24 hours (1 day)
-      const nextSendDate = new Date();
-      nextSendDate.setHours(nextSendDate.getHours() + 24);
+      // Parse hour and minute from cron_expression (format: "MM HH * * *")
+      let targetHour = 9;
+      let targetMinute = 0;
+      if (schedule.cron_expression) {
+        const parts = schedule.cron_expression.split(' ');
+        if (parts.length >= 2) {
+          targetMinute = parseInt(parts[0]) || 0;
+          targetHour = parseInt(parts[1]) || 9;
+        }
+      }
+
+      // Calculate next run time on the next day in Vietnam Time (UTC+7)
+      const now = new Date();
+      // Current time in Vietnam (add 7 hours)
+      const vnTime = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+      
+      // Set target hour & minute on Vietnam time
+      const targetVnTime = new Date(vnTime);
+      targetVnTime.setUTCHours(targetHour, targetMinute, 0, 0);
+      
+      // Add exactly 1 day since this send is completed
+      targetVnTime.setUTCDate(targetVnTime.getUTCDate() + 1);
+      
+      // Convert back to UTC (subtract 7 hours)
+      const nextSendDate = new Date(targetVnTime.getTime() - 7 * 60 * 60 * 1000);
 
       await supabase
         .from('schedules')

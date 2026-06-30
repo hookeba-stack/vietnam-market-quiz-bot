@@ -6,7 +6,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { GoogleGenAI } = require('@google/genai');
 
 // Load env variables
-dotenv.config();
+dotenv.config({ path: '.env.local' });
 
 console.log("=== BẮT ĐẦU KIỂM TRA TÍCH HỢP HỆ THỐNG ===");
 

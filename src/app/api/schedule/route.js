@@ -31,18 +31,35 @@ export async function POST(request) {
   }
 
   try {
-    const { chat_id, topic } = await request.json();
+    const { chat_id, topic, send_time } = await request.json();
 
     if (!chat_id || !topic) {
       return NextResponse.json({ error: 'Missing chat_id or topic' }, { status: 400 });
     }
 
-    // Set first run time to tomorrow morning at 9:00 AM (local/UTC standard transition)
-    const nextSendDate = new Date();
-    nextSendDate.setHours(9, 0, 0, 0); // 9:00 AM today
-    if (nextSendDate < new Date()) {
-      nextSendDate.setDate(nextSendDate.getDate() + 1); // 9:00 AM tomorrow
+    // Default to 9:00 AM if send_time is not specified
+    const timeVal = send_time || '09:00';
+    const [hourStr, minuteStr] = timeVal.split(':');
+    const targetHour = parseInt(hourStr) || 9;
+    const targetMinute = parseInt(minuteStr) || 0;
+
+    // Calculate first run time in Vietnam Time (UTC+7)
+    const now = new Date();
+    // Convert current UTC time to Vietnam Time (add 7 hours)
+    const vnTime = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+    
+    // Set target hour & minute on Vietnam time
+    const targetVnTime = new Date(vnTime);
+    targetVnTime.setUTCHours(targetHour, targetMinute, 0, 0);
+    
+    // If that time has already passed in Vietnam today, move it to tomorrow
+    if (targetVnTime <= vnTime) {
+      targetVnTime.setUTCDate(targetVnTime.getUTCDate() + 1);
     }
+    
+    // Convert back to UTC (subtract 7 hours)
+    const nextSendDate = new Date(targetVnTime.getTime() - 7 * 60 * 60 * 1000);
+    const cronExpr = `${targetMinute} ${targetHour} * * *`;
 
     const { data, error } = await supabase
       .from('schedules')
@@ -51,7 +68,7 @@ export async function POST(request) {
         topic,
         is_active: true,
         next_send_at: nextSendDate.toISOString(),
-        cron_expression: '0 9 * * *' // Visual Cron representation
+        cron_expression: cronExpr
       })
       .select();
 

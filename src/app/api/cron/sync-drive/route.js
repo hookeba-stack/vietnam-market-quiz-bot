@@ -48,9 +48,16 @@ function determineTopicFromFileName(fileName) {
 export async function GET(request) {
   // 1. Authorization Check (for Vercel Cron protection)
   const authHeader = request.headers.get('authorization');
+  const referer = request.headers.get('referer');
+  const host = request.headers.get('host');
   const isCronSecretConfigured = !!process.env.CRON_SECRET;
   
-  if (isCronSecretConfigured && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const isSameOrigin = referer && host && (
+    referer.startsWith(`http://${host}`) || 
+    referer.startsWith(`https://${host}`)
+  );
+
+  if (isCronSecretConfigured && authHeader !== `Bearer ${process.env.CRON_SECRET}` && !isSameOrigin) {
     // If not matching, check if we are in development mode to allow manual testing
     if (process.env.NODE_ENV !== 'development') {
       return new Response('Unauthorized', { status: 401 });

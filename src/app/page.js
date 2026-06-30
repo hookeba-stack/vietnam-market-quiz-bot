@@ -34,6 +34,10 @@ export default function Dashboard() {
     setMessage('');
     try {
       const res = await fetch('/api/cron/sync-drive');
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `HTTP error! status: ${res.status}`);
+      }
       const json = await res.json();
       if (json.success) {
         setMessage(`✅ Đồng bộ Drive thành công! ${json.message}`);
@@ -54,6 +58,10 @@ export default function Dashboard() {
     setMessage('');
     try {
       const res = await fetch('/api/cron/send-quiz');
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `HTTP error! status: ${res.status}`);
+      }
       const json = await res.json();
       if (json.success) {
         setMessage(`✅ Gửi Quiz thành công! ${json.message}`);

@@ -10,8 +10,21 @@ export default function SchedulePage() {
 
   // Form inputs
   const [chatId, setChatId] = useState('');
-  const [selectedTopic, setSelectedTopic] = useState('');
+  const [selectedTopic, setSelectedTopic] = useState('__random__');
+  const [sendTime, setSendTime] = useState('09:00');
   const [adding, setAdding] = useState(false);
+
+  // Helper to format cron expression to HH:MM
+  const formatCronTime = (cronStr) => {
+    if (!cronStr) return '09:00';
+    const parts = cronStr.split(' ');
+    if (parts.length >= 2) {
+      const min = parts[0].padStart(2, '0');
+      const hr = parts[1].padStart(2, '0');
+      return `${hr}:${min}`;
+    }
+    return '09:00';
+  };
 
   // Load schedules and topics
   const loadData = async () => {
@@ -29,9 +42,7 @@ export default function SchedulePage() {
       const jsonTopics = await resTopics.json();
       if (jsonTopics.success) {
         setTopics(jsonTopics.topics);
-        if (jsonTopics.topics.length > 0) {
-          setSelectedTopic(jsonTopics.topics[0].name);
-        }
+        setSelectedTopic('__random__');
       }
     } catch (err) {
       console.error("Failed to load schedules configuration data:", err);
@@ -57,7 +68,8 @@ export default function SchedulePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           chat_id: chatId.trim(),
-          topic: selectedTopic
+          topic: selectedTopic,
+          send_time: sendTime
         })
       });
       const json = await res.json();
@@ -133,10 +145,10 @@ export default function SchedulePage() {
       {loading ? (
         <p style={{ color: 'var(--text-muted)' }}>Đang tải cấu hình...</p>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '32px', alignItems: 'flex-start' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
           
-          {/* Left side: Add schedule form */}
-          <div className="glass-card">
+          {/* Top: Add schedule form */}
+          <div className="glass-card" style={{ maxWidth: '600px', width: '100%' }}>
             <h2 style={{ fontSize: '1.25rem', marginBottom: '20px' }}>⏰ Thêm Lịch Gửi Mới</h2>
             <form onSubmit={handleAddSchedule}>
               
@@ -154,31 +166,37 @@ export default function SchedulePage() {
 
               <div className="form-group">
                 <label className="form-label">Chủ đề trắc nghiệm:</label>
-                {topics.length === 0 ? (
-                  <p style={{ fontSize: '0.9rem', color: 'var(--danger)', fontWeight: '600' }}>⚠️ Vui lòng tạo câu hỏi Quiz trong phần "Quản lý Quiz" trước.</p>
-                ) : (
-                  <select 
-                    className="form-select" 
-                    value={selectedTopic}
-                    onChange={(e) => setSelectedTopic(e.target.value)}
-                    required
-                  >
-                    {topics.map((t, idx) => (
-                      <option key={idx} value={t.name}>{t.name} ({t.count} câu hỏi)</option>
-                    ))}
-                  </select>
-                )}
+                <select 
+                  className="form-select" 
+                  value={selectedTopic}
+                  onChange={(e) => setSelectedTopic(e.target.value)}
+                  required
+                >
+                  <option value="__random__">🎲 Ngẫu nhiên (Tất cả chủ đề)</option>
+                  {topics.map((t, idx) => (
+                    <option key={idx} value={t.name}>{t.name} ({t.count} câu hỏi)</option>
+                  ))}
+                </select>
               </div>
 
               <div className="form-group">
-                <label className="form-label">Thời gian gửi dự kiến:</label>
-                <input 
-                  type="text" 
-                  className="form-input" 
-                  value="Hàng ngày vào 9:00 AM (Tự động hóa)" 
-                  disabled 
-                  style={{ background: 'rgba(0,0,0,0.03)', color: 'var(--text-muted)' }}
-                />
+                <label className="form-label">Thời gian gửi hàng ngày:</label>
+                <select 
+                  className="form-select"
+                  value={sendTime}
+                  onChange={(e) => setSendTime(e.target.value)}
+                  required
+                >
+                  {Array.from({ length: 24 }).map((_, i) => {
+                    const hour = String(i).padStart(2, '0');
+                    const val = `${hour}:00`;
+                    return (
+                      <option key={val} value={val}>
+                        {val} {val === '09:00' ? '(Mặc định)' : ''}
+                      </option>
+                    );
+                  })}
+                </select>
               </div>
 
               <button 
@@ -212,6 +230,7 @@ export default function SchedulePage() {
                     <tr>
                       <th>Người nhận (Chat ID)</th>
                       <th>Chủ đề</th>
+                      <th>Giờ gửi</th>
                       <th>Gửi tiếp theo</th>
                       <th>Trạng thái</th>
                       <th style={{ textAlign: 'center' }}>Thao tác</th>
@@ -221,8 +240,11 @@ export default function SchedulePage() {
                     {schedules.map((schedule) => (
                       <tr key={schedule.id}>
                         <td style={{ fontSize: '0.85rem', fontFamily: 'monospace', fontWeight: '600' }}>{schedule.chat_id}</td>
-                        <td style={{ fontSize: '0.9rem', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {schedule.topic}
+                        <td style={{ fontSize: '0.9rem', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {schedule.topic === '__random__' ? '🎲 Ngẫu nhiên' : schedule.topic}
+                        </td>
+                        <td style={{ fontSize: '0.9rem', fontWeight: '600' }}>
+                          {formatCronTime(schedule.cron_expression)}
                         </td>
                         <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                           {schedule.is_active 
