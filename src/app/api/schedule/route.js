@@ -39,27 +39,39 @@ export async function POST(request) {
 
     // Default to 9:00 AM if send_time is not specified
     const timeVal = send_time || '09:00';
-    const [hourStr, minuteStr] = timeVal.split(':');
-    const targetHour = parseInt(hourStr) || 9;
-    const targetMinute = parseInt(minuteStr) || 0;
+    let nextSendDate;
+    let cronExpr;
 
-    // Calculate first run time in Vietnam Time (UTC+7)
-    const now = new Date();
-    // Convert current UTC time to Vietnam Time (add 7 hours)
-    const vnTime = new Date(now.getTime() + 7 * 60 * 60 * 1000);
-    
-    // Set target hour & minute on Vietnam time
-    const targetVnTime = new Date(vnTime);
-    targetVnTime.setUTCHours(targetHour, targetMinute, 0, 0);
-    
-    // If that time has already passed in Vietnam today, move it to tomorrow
-    if (targetVnTime <= vnTime) {
-      targetVnTime.setUTCDate(targetVnTime.getUTCDate() + 1);
+    if (timeVal === 'hourly') {
+      cronExpr = '0 * * * *';
+      const now = new Date();
+      // Set to next hour (e.g., if now is 12:15, set to 13:00 UTC)
+      const nextHour = new Date(now);
+      nextHour.setUTCHours(now.getUTCHours() + 1, 0, 0, 0);
+      nextSendDate = nextHour;
+    } else {
+      const [hourStr, minuteStr] = timeVal.split(':');
+      const targetHour = parseInt(hourStr) || 9;
+      const targetMinute = parseInt(minuteStr) || 0;
+
+      // Calculate first run time in Vietnam Time (UTC+7)
+      const now = new Date();
+      // Convert current UTC time to Vietnam Time (add 7 hours)
+      const vnTime = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+      
+      // Set target hour & minute on Vietnam time
+      const targetVnTime = new Date(vnTime);
+      targetVnTime.setUTCHours(targetHour, targetMinute, 0, 0);
+      
+      // If that time has already passed in Vietnam today, move it to tomorrow
+      if (targetVnTime <= vnTime) {
+        targetVnTime.setUTCDate(targetVnTime.getUTCDate() + 1);
+      }
+      
+      // Convert back to UTC (subtract 7 hours)
+      nextSendDate = new Date(targetVnTime.getTime() - 7 * 60 * 60 * 1000);
+      cronExpr = `${targetMinute} ${targetHour} * * *`;
     }
-    
-    // Convert back to UTC (subtract 7 hours)
-    const nextSendDate = new Date(targetVnTime.getTime() - 7 * 60 * 60 * 1000);
-    const cronExpr = `${targetMinute} ${targetHour} * * *`;
 
     const { data, error } = await supabase
       .from('schedules')

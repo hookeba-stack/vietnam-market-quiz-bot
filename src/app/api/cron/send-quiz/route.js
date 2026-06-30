@@ -131,31 +131,41 @@ export async function GET(request) {
       }
 
       // f. Update schedule last_sent_at and calculate next_send_at
-      // Parse hour and minute from cron_expression (format: "MM HH * * *")
-      let targetHour = 9;
-      let targetMinute = 0;
-      if (schedule.cron_expression) {
-        const parts = schedule.cron_expression.split(' ');
-        if (parts.length >= 2) {
-          targetMinute = parseInt(parts[0]) || 0;
-          targetHour = parseInt(parts[1]) || 9;
-        }
-      }
+      let nextSendDate;
 
-      // Calculate next run time on the next day in Vietnam Time (UTC+7)
-      const now = new Date();
-      // Current time in Vietnam (add 7 hours)
-      const vnTime = new Date(now.getTime() + 7 * 60 * 60 * 1000);
-      
-      // Set target hour & minute on Vietnam time
-      const targetVnTime = new Date(vnTime);
-      targetVnTime.setUTCHours(targetHour, targetMinute, 0, 0);
-      
-      // Add exactly 1 day since this send is completed
-      targetVnTime.setUTCDate(targetVnTime.getUTCDate() + 1);
-      
-      // Convert back to UTC (subtract 7 hours)
-      const nextSendDate = new Date(targetVnTime.getTime() - 7 * 60 * 60 * 1000);
+      if (schedule.cron_expression === '0 * * * *') {
+        const now = new Date();
+        // Set to next hour (e.g., if now is 12:15, set to 13:00 UTC)
+        const nextHour = new Date(now);
+        nextHour.setUTCHours(now.getUTCHours() + 1, 0, 0, 0);
+        nextSendDate = nextHour;
+      } else {
+        // Parse hour and minute from cron_expression (format: "MM HH * * *")
+        let targetHour = 9;
+        let targetMinute = 0;
+        if (schedule.cron_expression) {
+          const parts = schedule.cron_expression.split(' ');
+          if (parts.length >= 2) {
+            targetMinute = parseInt(parts[0]) || 0;
+            targetHour = parseInt(parts[1]) || 9;
+          }
+        }
+
+        // Calculate next run time on the next day in Vietnam Time (UTC+7)
+        const now = new Date();
+        // Current time in Vietnam (add 7 hours)
+        const vnTime = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+        
+        // Set target hour & minute on Vietnam time
+        const targetVnTime = new Date(vnTime);
+        targetVnTime.setUTCHours(targetHour, targetMinute, 0, 0);
+        
+        // Add exactly 1 day since this send is completed
+        targetVnTime.setUTCDate(targetVnTime.getUTCDate() + 1);
+        
+        // Convert back to UTC (subtract 7 hours)
+        nextSendDate = new Date(targetVnTime.getTime() - 7 * 60 * 60 * 1000);
+      }
 
       await supabase
         .from('schedules')

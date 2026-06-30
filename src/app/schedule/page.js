@@ -17,6 +17,7 @@ export default function SchedulePage() {
   // Helper to format cron expression to HH:MM
   const formatCronTime = (cronStr) => {
     if (!cronStr) return '09:00';
+    if (cronStr === '0 * * * *') return 'Hàng giờ (1 tiếng/lần)';
     const parts = cronStr.split(' ');
     if (parts.length >= 2) {
       const min = parts[0].padStart(2, '0');
@@ -187,6 +188,7 @@ export default function SchedulePage() {
                   onChange={(e) => setSendTime(e.target.value)}
                   required
                 >
+                  <option value="hourly">⏰ Gửi hàng giờ (Cách 1 tiếng/lần)</option>
                   {Array.from({ length: 24 }).map((_, i) => {
                     const hour = String(i).padStart(2, '0');
                     const val = `${hour}:00`;
