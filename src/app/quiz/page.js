@@ -171,15 +171,10 @@ export default function QuizPage() {
     <div>
       {/* 1. Header Area */}
       <header style={{ marginBottom: '32px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-        {selectedTopic && (
-          <button onClick={handleBack} className="btn btn-secondary" style={{ padding: '8px 16px', fontSize: '0.85rem' }}>
-            ⬅️ Quay lại
-          </button>
-        )}
         <div>
-          <h1 style={{ margin: 0 }}>{selectedTopic ? 'Chi Tiết Câu Hỏi' : 'Quản Lý Quiz Thị Trường'}</h1>
+          <h1 style={{ margin: 0 }}>Quản Lý Quiz Thị Trường</h1>
           <p style={{ marginTop: '4px' }}>
-            {selectedTopic ? `Danh sách câu hỏi của chủ đề: ${selectedTopic}` : 'Tạo, quản lý và duyệt câu hỏi trắc nghiệm dựa trên các báo cáo.'}
+            Tạo, quản lý và duyệt câu hỏi trắc nghiệm dựa trên các báo cáo.
           </p>
         </div>
       </header>
@@ -191,88 +186,99 @@ export default function QuizPage() {
         </div>
       )}
 
-      {/* 2. Primary Page Content */}
-      {!selectedTopic ? (
-        // STATE 1: List of Topics & Generator Form
-        <div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '32px', alignItems: 'flex-start' }}>
-            
-            {/* Left side: AI Quiz Generator Form */}
-            <div className="glass-card">
-              <h2 style={{ fontSize: '1.25rem', marginBottom: '20px' }}>🤖 Sinh Quiz Mới Bằng AI</h2>
-              <form onSubmit={handleGenerateQuizzes}>
-                
-                {/* File from Google Drive Dropdown */}
-                <div className="form-group">
-                  <label className="form-label">Chọn file báo cáo từ Drive:</label>
-                  {driveFiles.length === 0 ? (
-                    <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Đang tải danh sách file...</p>
-                  ) : (
-                    <select className="form-select" value={selectedFileId} onChange={handleFileChange} required>
-                      <option value="" disabled>-- Chọn báo cáo --</option>
-                      {driveFiles.map(file => (
-                        <option key={file.id} value={file.id}>
-                          {file.status === 'processed' ? '✅' : '⏳'} {file.name.replace('Copy of ', '')}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
+      {/* 2. Primary Page Content: Form & Topic List */}
+      <div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '32px', alignItems: 'flex-start' }}>
+          
+          {/* Left side: AI Quiz Generator Form */}
+          <div className="glass-card">
+            <h2 style={{ fontSize: '1.25rem', marginBottom: '20px' }}>🤖 Sinh Quiz Mới Bằng AI</h2>
+            <form onSubmit={handleGenerateQuizzes}>
+              
+              {/* File from Google Drive Dropdown */}
+              <div className="form-group">
+                <label className="form-label">Chọn file báo cáo từ Drive:</label>
+                {driveFiles.length === 0 ? (
+                  <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Đang tải danh sách file...</p>
+                ) : (
+                  <select className="form-select" value={selectedFileId} onChange={handleFileChange} required>
+                    <option value="" disabled>-- Chọn báo cáo --</option>
+                    {driveFiles.map(file => (
+                      <option key={file.id} value={file.id}>
+                        {file.status === 'processed' ? '✅' : '⏳'} {file.name.replace('Copy of ', '')}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
 
-                {/* Topic selection mapping */}
+              {/* Topic selection mapping */}
+              <div className="form-group">
+                <label className="form-label">Chủ đề gán cho Quiz:</label>
+                <select 
+                  className="form-select" 
+                  value={customTopicName} 
+                  onChange={(e) => setCustomTopicName(e.target.value)}
+                  required
+                >
+                  {DEFAULT_TOPICS.map((t, idx) => (
+                    <option key={idx} value={t}>{t}</option>
+                  ))}
+                  <option value="Khác">-- Tạo chủ đề mới (dựa theo tên file) --</option>
+                </select>
+              </div>
+
+              {customTopicName === 'Khác' && (
                 <div className="form-group">
-                  <label className="form-label">Chủ đề gán cho Quiz:</label>
-                  <select 
-                    className="form-select" 
-                    value={customTopicName} 
+                  <label className="form-label">Nhập tên chủ đề mới:</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    placeholder="Ví dụ: Xu hướng Thời trang 2026" 
+                    value={customTopicName === 'Khác' ? '' : customTopicName}
                     onChange={(e) => setCustomTopicName(e.target.value)}
                     required
-                  >
-                    {DEFAULT_TOPICS.map((t, idx) => (
-                      <option key={idx} value={t}>{t}</option>
-                    ))}
-                    <option value="Khác">-- Tạo chủ đề mới (dựa theo tên file) --</option>
-                  </select>
+                  />
                 </div>
+              )}
 
-                {customTopicName === 'Khác' && (
-                  <div className="form-group">
-                    <label className="form-label">Nhập tên chủ đề mới:</label>
-                    <input 
-                      type="text" 
-                      className="form-input" 
-                      placeholder="Ví dụ: Xu hướng Thời trang 2026" 
-                      value={customTopicName === 'Khác' ? '' : customTopicName}
-                      onChange={(e) => setCustomTopicName(e.target.value)}
-                      required
-                    />
-                  </div>
-                )}
+              <button 
+                type="submit" 
+                className="btn btn-primary" 
+                style={{ width: '100%', marginTop: '12px' }}
+                disabled={generating || !selectedFileId}
+              >
+                {generating ? '⚙️ Đang phân tích & tạo Quiz...' : '✨ Sinh 20 Quiz Bằng Gemini'}
+              </button>
+            </form>
 
-                <button 
-                  type="submit" 
-                  className="btn btn-primary" 
-                  style={{ width: '100%', marginTop: '12px' }}
-                  disabled={generating || !selectedFileId}
-                >
-                  {generating ? '⚙️ Đang phân tích & tạo Quiz...' : '✨ Sinh 20 Quiz Bằng Gemini'}
-                </button>
-              </form>
-
-              <div style={{ marginTop: '20px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                <p>💡 <b>Gợi ý:</b> Biểu tượng ⏳ hiển thị các báo cáo chưa được đọc. Chọn file chưa đọc để AI tiến hành phân tích sâu và sinh câu hỏi.</p>
-              </div>
+            <div style={{ marginTop: '20px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              <p>💡 <b>Gợi ý:</b> Biểu tượng ⏳ hiển thị các báo cáo chưa được đọc. Chọn file chưa đọc để AI tiến hành phân tích sâu và sinh câu hỏi.</p>
             </div>
+          </div>
 
-            {/* Right side: Grid of existing Topics */}
-            <div>
-              <h2 style={{ fontSize: '1.25rem', marginBottom: '20px' }}>📁 Danh Sách Chủ Đề Hiện Tại</h2>
-              {loadingTopics ? (
-                <p style={{ color: 'var(--text-muted)' }}>Đang tải danh sách chủ đề...</p>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
-                  {topics.map((topic, index) => (
-                    <div key={index} className="glass-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '180px' }}>
+          {/* Right side: Grid of existing Topics */}
+          <div>
+            <h2 style={{ fontSize: '1.25rem', marginBottom: '20px' }}>📁 Danh Sách Chủ Đề Hiện Tại</h2>
+            {loadingTopics ? (
+              <p style={{ color: 'var(--text-muted)' }}>Đang tải danh sách chủ đề...</p>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
+                {topics.map((topic, index) => {
+                  const isSelected = selectedTopic === topic.name;
+                  return (
+                    <div 
+                      key={index} 
+                      className="glass-card" 
+                      style={{ 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        justify: 'space-between', 
+                        minHeight: '180px',
+                        border: isSelected ? '2px solid var(--primary)' : '1px solid rgba(0, 0, 0, 0.08)',
+                        boxShadow: isSelected ? '0 8px 30px rgba(0, 0, 0, 0.12)' : 'none'
+                      }}
+                    >
                       <div>
                         <h3 style={{ fontSize: '1rem', fontWeight: '700', lineHeight: '1.4', marginBottom: '8px', color: topic.count > 0 ? 'var(--primary)' : 'var(--text-main)' }}>
                           {topic.name}
@@ -283,22 +289,34 @@ export default function QuizPage() {
                       </div>
                       <button 
                         onClick={() => handleSelectTopic(topic.name)} 
-                        className="btn btn-secondary" 
+                        className={`btn ${isSelected ? 'btn-primary' : 'btn-secondary'}`} 
                         style={{ marginTop: '16px', width: '100%', fontSize: '0.85rem', padding: '8px' }}
                       >
-                        {topic.count > 0 ? '🔍 Xem danh sách Quiz' : '⚙️ Sinh câu hỏi trước'}
+                        {topic.count > 0 ? (isSelected ? '👀 Đang hiển thị dưới' : '🔍 Xem danh sách Quiz') : '⚙️ Sinh câu hỏi trước'}
                       </button>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
+                  );
+                })}
+              </div>
+            )}
           </div>
+
         </div>
-      ) : (
-        // STATE 2: List of Quiz questions for selected topic
-        <div>
+      </div>
+
+      {/* 3. Quiz Questions Detail Section Below */}
+      {selectedTopic && (
+        <div style={{ marginTop: '48px', borderTop: '2px dashed rgba(0,0,0,0.1)', paddingTop: '32px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+            <div>
+              <h2 style={{ fontSize: '1.5rem', margin: 0, color: 'var(--text-main)' }}>📋 Chi tiết câu hỏi: {selectedTopic}</h2>
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '4px' }}>Danh sách câu hỏi trắc nghiệm của chủ đề được tải chi tiết bên dưới.</p>
+            </div>
+            <button onClick={handleBack} className="btn btn-secondary" style={{ padding: '8px 16px', fontSize: '0.85rem' }}>
+              ❌ Đóng / Ẩn danh sách
+            </button>
+          </div>
+
           {loadingQuizzes ? (
             <p style={{ color: 'var(--text-muted)' }}>Đang tải dữ liệu câu hỏi...</p>
           ) : (

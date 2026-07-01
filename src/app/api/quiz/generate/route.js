@@ -24,11 +24,54 @@ export async function POST(request) {
       fileBuffer = await downloadDriveFile(fileId);
     }
 
-    // Call Gemini to generate 20 quizzes
-    const generatedQuizzes = await generateQuizzesFromAI(topic, fileName, fileBuffer);
+    // Fetch all existing quizzes to do duplicate checking
+    let existingQuestions = [];
+    try {
+      const { data: existingData, error: fetchErr } = await supabase
+        .from('quizzes')
+        .select('question');
+      if (!fetchErr && existingData) {
+        existingQuestions = existingData.map(q => q.question);
+      }
+    } catch (e) {
+      console.error('Failed to fetch existing questions for duplicate checking:', e);
+    }
+
+    // Call Gemini to generate 20 quizzes (passing existingQuestions)
+    const generatedQuizzes = await generateQuizzesFromAI(topic, fileName, fileBuffer, existingQuestions);
+
+    // Helper to normalize questions for comparison (ignoring case, spaces, punctuation, and prefix)
+    const normalizeQuestion = (qText) => {
+      if (!qText) return '';
+      return qText
+        .replace(/^\[Câu hỏi \d+\]\s*(Dựa trên báo cáo [^:]+:\s*)?/i, '') // Remove prefix
+        .toLowerCase()
+        .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?\s]/g, ''); // Remove punctuation and spaces
+    };
+
+    const existingNormalized = new Set(existingQuestions.map(q => normalizeQuestion(q)));
+    const uniqueNewQuizzes = [];
+    const seenInBatch = new Set();
+
+    for (const quiz of generatedQuizzes) {
+      const norm = normalizeQuestion(quiz.question);
+      if (!existingNormalized.has(norm) && !seenInBatch.has(norm)) {
+        uniqueNewQuizzes.push(quiz);
+        seenInBatch.add(norm);
+      } else {
+        console.warn(`Skipping duplicate question: "${quiz.question}"`);
+      }
+    }
+
+    if (uniqueNewQuizzes.length === 0) {
+      return NextResponse.json({
+        success: false,
+        message: `Tất cả các câu hỏi được tạo ra đều bị trùng lặp với các bài trắc nghiệm đã có. Vui lòng kiểm tra lại cấu hình hoặc API Key.`
+      }, { status: 400 });
+    }
 
     // Save quizzes to Database
-    const quizzesToInsert = generatedQuizzes.map(q => ({
+    const quizzesToInsert = uniqueNewQuizzes.map(q => ({
       topic: topic,
       question: q.question,
       options: q.options,

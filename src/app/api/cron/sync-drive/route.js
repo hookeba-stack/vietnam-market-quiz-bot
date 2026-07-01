@@ -105,24 +105,64 @@ export async function GET(request) {
       fileBuffer = await downloadDriveFile(fileToProcess.id);
     }
 
+    // Fetch all existing quizzes to do duplicate checking
+    let existingQuestions = [];
+    try {
+      const { data: existingData, error: fetchErr } = await supabase
+        .from('quizzes')
+        .select('question');
+      if (!fetchErr && existingData) {
+        existingQuestions = existingData.map(q => q.question);
+      }
+    } catch (e) {
+      console.error('Failed to fetch existing questions for duplicate checking:', e);
+    }
+
     // Call Gemini API to generate quizzes
-    const quizzes = await generateQuizzesFromAI(topic, fileToProcess.name, fileBuffer);
+    const quizzes = await generateQuizzesFromAI(topic, fileToProcess.name, fileBuffer, existingQuestions);
     
-    const quizzesToInsert = quizzes.map(q => ({
-      topic: topic,
-      question: q.question,
-      options: q.options,
-      correct_option: q.correct_option,
-      explanation: q.explanation,
-      source_file: fileToProcess.name
-    }));
+    // Helper to normalize questions for comparison (ignoring case, spaces, punctuation, and prefix)
+    const normalizeQuestion = (qText) => {
+      if (!qText) return '';
+      return qText
+        .replace(/^\[Câu hỏi \d+\]\s*(Dựa trên báo cáo [^:]+:\s*)?/i, '') // Remove prefix
+        .toLowerCase()
+        .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?\s]/g, ''); // Remove punctuation and spaces
+    };
 
-    // Save quizzes to DB
-    const { error: quizInsertError } = await supabase
-      .from('quizzes')
-      .insert(quizzesToInsert);
+    const existingNormalized = new Set(existingQuestions.map(q => normalizeQuestion(q)));
+    const uniqueNewQuizzes = [];
+    const seenInBatch = new Set();
 
-    if (quizInsertError) throw quizInsertError;
+    for (const quiz of quizzes) {
+      const norm = normalizeQuestion(quiz.question);
+      if (!existingNormalized.has(norm) && !seenInBatch.has(norm)) {
+        uniqueNewQuizzes.push(quiz);
+        seenInBatch.add(norm);
+      } else {
+        console.warn(`Skipping duplicate question: "${quiz.question}"`);
+      }
+    }
+
+    if (uniqueNewQuizzes.length === 0) {
+      console.warn("All generated quizzes for this file were duplicates. Skipping database insert.");
+    } else {
+      const quizzesToInsert = uniqueNewQuizzes.map(q => ({
+        topic: topic,
+        question: q.question,
+        options: q.options,
+        correct_option: q.correct_option,
+        explanation: q.explanation,
+        source_file: fileToProcess.name
+      }));
+
+      // Save quizzes to DB
+      const { error: quizInsertError } = await supabase
+        .from('quizzes')
+        .insert(quizzesToInsert);
+
+      if (quizInsertError) throw quizInsertError;
+    }
 
     // Log this file as successfully processed
     const { error: processedInsertError } = await supabase

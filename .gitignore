@@ -44,3 +44,5 @@ next-env.d.ts
 .env*
 credentials.json
 scripts/test-gemini-key.js
+
+.env*
