@@ -54,3 +54,65 @@ export async function GET(request) {
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
   }
 }
+
+export async function DELETE(request) {
+  if (!supabase) {
+    return NextResponse.json({ error: 'Database connection not configured' }, { status: 500 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get('id');
+  const topic = searchParams.get('topic');
+
+  try {
+    if (id) {
+      // 1. Delete a single quiz question
+      const { error } = await supabase
+        .from('quizzes')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      return NextResponse.json({
+        success: true,
+        message: 'Đã xóa câu hỏi thành công!'
+      });
+    } else if (topic) {
+      // 2. Fetch source files of the quizzes in this topic
+      const { data: quizzesToDelete, error: fetchErr } = await supabase
+        .from('quizzes')
+        .select('source_file')
+        .eq('topic', topic);
+
+      if (!fetchErr && quizzesToDelete) {
+        // Reset Drive file status in processed_files so they can be re-analyzed
+        const sourceFiles = [...new Set(quizzesToDelete.map(q => q.source_file).filter(Boolean))];
+        if (sourceFiles.length > 0) {
+          await supabase
+            .from('processed_files')
+            .delete()
+            .in('file_name', sourceFiles);
+        }
+      }
+
+      // 3. Delete all quizzes of the topic
+      const { error } = await supabase
+        .from('quizzes')
+        .delete()
+        .eq('topic', topic);
+
+      if (error) throw error;
+
+      return NextResponse.json({
+        success: true,
+        message: `Đã xóa toàn bộ câu hỏi thuộc chủ đề '${topic}'!`
+      });
+    } else {
+      return NextResponse.json({ error: 'Thiếu tham số id hoặc topic' }, { status: 400 });
+    }
+  } catch (error) {
+    console.error('Quiz delete API error:', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+  }
+}

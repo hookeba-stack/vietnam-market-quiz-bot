@@ -167,6 +167,47 @@ export default function QuizPage() {
     }
   };
 
+  // Handle deleting a single quiz question
+  const handleDeleteQuiz = async (quizId) => {
+    if (!window.confirm('❓ Bạn có chắc chắn muốn xóa câu hỏi này?')) return;
+    
+    try {
+      const res = await fetch(`/api/quiz/list?id=${quizId}`, {
+        method: 'DELETE',
+      });
+      const json = await res.json();
+      if (json.success) {
+        setFeedback('✅ Đã xóa câu hỏi thành công!');
+        loadQuizzes(selectedTopic);
+        loadTopics();
+      } else {
+        setFeedback(`❌ Lỗi khi xóa: ${json.error}`);
+      }
+    } catch (err) {
+      setFeedback(`❌ Lỗi kết nối API: ${err.message}`);
+    }
+  };
+
+  // Handle deleting all quizzes for a topic
+  const handleDeleteAllQuizzes = async (topicName) => {
+    if (!window.confirm(`⚠️ CẢNH BÁO: Bạn có chắc chắn muốn xóa TOÀN BỘ câu hỏi thuộc chủ đề "${topicName}"?\n\nHành động này không thể hoàn tác và sẽ khôi phục trạng thái file báo cáo tương ứng thành "Chưa đọc".`)) return;
+    
+    try {
+      const res = await fetch(`/api/quiz/list?topic=${encodeURIComponent(topicName)}`, {
+        method: 'DELETE',
+      });
+      const json = await res.json();
+      if (json.success) {
+        setFeedback(`✅ ${json.message}`);
+        handleBack();
+      } else {
+        setFeedback(`❌ Lỗi khi xóa: ${json.error}`);
+      }
+    } catch (err) {
+      setFeedback(`❌ Lỗi kết nối API: ${err.message}`);
+    }
+  };
+
   return (
     <div>
       {/* 1. Header Area */}
@@ -186,12 +227,11 @@ export default function QuizPage() {
         </div>
       )}
 
-      {/* 2. Primary Page Content: Form & Topic List */}
-      <div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '32px', alignItems: 'flex-start' }}>
-          
-          {/* Left side: AI Quiz Generator Form */}
-          <div className="glass-card">
+      {/* 2. Primary Page Content: Form on top, Topic List below */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
+        
+        {/* Top: AI Quiz Generator Form */}
+        <div className="glass-card" style={{ maxWidth: '800px', width: '100%', margin: '0 auto' }}>
             <h2 style={{ fontSize: '1.25rem', marginBottom: '20px' }}>🤖 Sinh Quiz Mới Bằng AI</h2>
             <form onSubmit={handleGenerateQuizzes}>
               
@@ -257,7 +297,7 @@ export default function QuizPage() {
             </div>
           </div>
 
-          {/* Right side: Grid of existing Topics */}
+          {/* Bottom: Grid of existing Topics */}
           <div>
             <h2 style={{ fontSize: '1.25rem', marginBottom: '20px' }}>📁 Danh Sách Chủ Đề Hiện Tại</h2>
             {loadingTopics ? (
@@ -292,7 +332,7 @@ export default function QuizPage() {
                         className={`btn ${isSelected ? 'btn-primary' : 'btn-secondary'}`} 
                         style={{ marginTop: '16px', width: '100%', fontSize: '0.85rem', padding: '8px' }}
                       >
-                        {topic.count > 0 ? (isSelected ? '👀 Đang hiển thị dưới' : '🔍 Xem danh sách Quiz') : '⚙️ Sinh câu hỏi trước'}
+                        {topic.count > 0 ? (isSelected ? '👀 Đang xem chi tiết' : '🔍 Xem danh sách Quiz') : '⚙️ Sinh câu hỏi trước'}
                       </button>
                     </div>
                   );
@@ -301,7 +341,6 @@ export default function QuizPage() {
             )}
           </div>
 
-        </div>
       </div>
 
       {/* 3. Quiz Questions Detail Section Below */}
@@ -328,21 +367,45 @@ export default function QuizPage() {
                   <span style={{ fontWeight: '700' }}>Tổng số: {quizzes.length} câu hỏi đang hoạt động</span>
                 </div>
 
-                <button 
-                  onClick={() => {
-                    const matchedFile = driveFiles.find(f => f.status === 'processed') || driveFiles[0];
-                    if (matchedFile) {
-                      setSelectedFileId(matchedFile.id);
-                      setSelectedFileName(matchedFile.name);
-                      setCustomTopicName(selectedTopic);
-                      handleGenerateQuizzes();
-                    }
-                  }} 
-                  disabled={generating}
-                  className="btn btn-primary"
-                >
-                  {generating ? '🔄 Đang sinh...' : '✨ Sinh thêm 20 câu hỏi bằng AI'}
-                </button>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <button 
+                    onClick={() => handleDeleteAllQuizzes(selectedTopic)} 
+                    disabled={generating || quizzes.length === 0}
+                    className="btn"
+                    style={{ 
+                      backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                      border: '1px solid rgba(239, 68, 68, 0.2)',
+                      color: 'var(--danger)',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'var(--danger)';
+                      e.currentTarget.style.color = '#ffffff';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.08)';
+                      e.currentTarget.style.color = 'var(--danger)';
+                    }}
+                  >
+                    🗑️ Xóa toàn bộ câu hỏi
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      const matchedFile = driveFiles.find(f => f.status === 'processed') || driveFiles[0];
+                      if (matchedFile) {
+                        setSelectedFileId(matchedFile.id);
+                        setSelectedFileName(matchedFile.name);
+                        setCustomTopicName(selectedTopic);
+                        handleGenerateQuizzes();
+                      }
+                    }} 
+                    disabled={generating}
+                    className="btn btn-primary"
+                  >
+                    {generating ? '🔄 Đang sinh...' : '✨ Sinh thêm 20 câu hỏi bằng AI'}
+                  </button>
+                </div>
               </div>
 
               {/* Quizzes List rendering */}
@@ -357,8 +420,37 @@ export default function QuizPage() {
                     const shortId = quiz.id ? quiz.id.substring(0, 8) : 'TEMP';
                     return (
                       <div key={quiz.id || index} className="glass-card" style={{ background: '#ffffff', borderLeft: '5px solid var(--primary-light)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                          <span style={{ fontWeight: '800', color: 'var(--primary-light)', fontSize: '0.9rem' }}>CÂU HỎI {index + 1} (Mã: Q_{shortId})</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <span style={{ fontWeight: '800', color: 'var(--primary-light)', fontSize: '0.9rem' }}>CÂU HỎI {index + 1} (Mã: Q_{shortId})</span>
+                            <button 
+                              onClick={() => handleDeleteQuiz(quiz.id)}
+                              style={{ 
+                                background: 'none', 
+                                border: 'none', 
+                                color: 'var(--danger)', 
+                                cursor: 'pointer', 
+                                fontSize: '0.85rem',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 8px',
+                                borderRadius: '4px',
+                                transition: 'all 0.2s ease'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.08)';
+                                e.currentTarget.style.transform = 'scale(1.05)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                                e.currentTarget.style.transform = 'scale(1)';
+                              }}
+                              title="Xóa câu hỏi này"
+                            >
+                              🗑️ Xóa
+                            </button>
+                          </div>
                           {quiz.source_file && (
                             <span style={{ fontSize: '0.75rem', background: '#f1f5f9', padding: '4px 8px', borderRadius: '4px', color: 'var(--text-muted)' }}>
                               📄 {quiz.source_file.replace('Copy of ', '')}
