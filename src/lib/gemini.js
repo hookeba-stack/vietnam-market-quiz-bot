@@ -128,7 +128,7 @@ ${exclusionInstruction}
       baseQuestions = mockQuizzesData["1-1_REPORT_DIGITAL_VIETNAM_2025"];
     } else if (name.includes('e-commerce') || name.includes('ecommerce') || name.includes('shopper')) {
       baseQuestions = mockQuizzesData["1-2_2025_E-Commerce_Trends"];
-    } else if (name.includes('beverage') || name.includes('beer') || name.includes('nước giải khát')) {
+    } else if (name.includes('beverage') || name.includes('beer') || name.includes('nước giải khát') || name.includes('bia') || name.includes('drink')) {
       baseQuestions = mockQuizzesData["1-3_Beverage-Market"];
     } else if (name.includes('digital_landscape') || name.includes('digital landscape') || name.includes('anymind')) {
       baseQuestions = mockQuizzesData["1-4_Vietnam_Digital_Landscape"];

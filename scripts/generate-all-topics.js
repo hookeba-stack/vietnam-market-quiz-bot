@@ -152,7 +152,7 @@ Yêu cầu cho mỗi câu hỏi trắc nghiệm:
       baseKey = "1-1_REPORT_DIGITAL_VIETNAM_2025";
     } else if (name.includes('e-commerce') || name.includes('ecommerce') || name.includes('shopper')) {
       baseKey = "1-2_2025_E-Commerce_Trends";
-    } else if (name.includes('beverage') || name.includes('beer') || name.includes('nước giải khát') || name.includes('food-drink') || name.includes('food_drink')) {
+    } else if (name.includes('beverage') || name.includes('beer') || name.includes('nước giải khát') || name.includes('food-drink') || name.includes('food_drink') || name.includes('bia') || name.includes('drink')) {
       baseKey = "1-3_Beverage-Market";
     } else if (name.includes('digital_landscape') || name.includes('digital landscape') || name.includes('anymind')) {
       baseKey = "1-4_Vietnam_Digital_Landscape";
