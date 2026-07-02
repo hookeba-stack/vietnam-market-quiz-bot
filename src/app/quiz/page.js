@@ -131,9 +131,14 @@ export default function QuizPage() {
   };
 
   // Handle generating new quizzes via Gemini API
-  const handleGenerateQuizzes = async (e) => {
-    if (e) e.preventDefault();
-    if (!selectedFileName) return;
+  const handleGenerateQuizzes = async (e, overrideParams = null) => {
+    if (e && e.preventDefault) e.preventDefault();
+    
+    const fileId = overrideParams ? overrideParams.fileId : selectedFileId;
+    const fileName = overrideParams ? overrideParams.fileName : selectedFileName;
+    const topicName = overrideParams ? overrideParams.topic : customTopicName;
+
+    if (!fileName) return;
 
     setGenerating(true);
     setFeedback('');
@@ -143,15 +148,15 @@ export default function QuizPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          topic: customTopicName,
-          fileName: selectedFileName,
-          fileId: selectedFileId
+          topic: topicName,
+          fileName: fileName,
+          fileId: fileId
         })
       });
       const json = await res.json();
       if (json.success) {
         setFeedback(`✅ Đã tạo thành công ${json.quizzes.length} câu hỏi mới cho chủ đề!`);
-        if (selectedTopic === customTopicName) {
+        if (selectedTopic === topicName) {
           loadQuizzes(selectedTopic);
         } else {
           loadTopics();
@@ -392,12 +397,53 @@ export default function QuizPage() {
 
                   <button 
                     onClick={() => {
-                      const matchedFile = driveFiles.find(f => f.status === 'processed') || driveFiles[0];
+                      // Find file for this topic
+                      const matchedFile = driveFiles.find(f => {
+                        const name = f.name.toLowerCase();
+                        if (selectedTopic.includes('Thương Mại Điện Tử') || selectedTopic.includes('E-Commerce')) {
+                          return name.includes('e-commerce') || name.includes('ecommerce') || name.includes('shopper');
+                        }
+                        if (selectedTopic.includes('Người Tiêu Dùng') || selectedTopic.includes('Consumer Trends')) {
+                          return name.includes('consumer trends') || name.includes('xu huong hanh vi') || name.includes('vads2025') || name.includes('vietnam consumer');
+                        }
+                        if (selectedTopic.includes('Mỹ Phẩm') || selectedTopic.includes('Skincare') || selectedTopic.includes('Cosmetics')) {
+                          return name.includes('skincare') || name.includes('my pham') || name.includes('hair care') || name.includes('beauty');
+                        }
+                        if (selectedTopic.includes('Tết')) {
+                          return name.includes('tết') || name.includes('tet') || name.includes('brand playbook');
+                        }
+                        if (selectedTopic.includes('Coffee')) {
+                          return name.includes('coffee') || name.includes('cà phê') || name.includes('chuỗi cửa hàng');
+                        }
+                        if (selectedTopic.includes('Mạng Xã Hội') || selectedTopic.includes('Social Commerce')) {
+                          return name.includes('social commerce') || name.includes('discovery & purchase');
+                        }
+                        if (selectedTopic.includes('Đường Phố') || selectedTopic.includes('Street Food')) {
+                          return name.includes('street food') || name.includes('am thuc duong pho');
+                        }
+                        if (selectedTopic.includes('Dược Phẩm') || selectedTopic.includes('Pharmacy')) {
+                          return name.includes('dược phẩm') || name.includes('retail pharmacy') || name.includes('pharmaceutical');
+                        }
+                        if (selectedTopic.includes('Thanh Toán') || selectedTopic.includes('Paytech')) {
+                          return name.includes('paytech') || name.includes('thanh toan') || name.includes('payment');
+                        }
+                        if (selectedTopic.includes('Nước Giải Khát') || selectedTopic.includes('Beverage') || selectedTopic.includes('Bia')) {
+                          return name.includes('beverage') || name.includes('bia') || name.includes('food-drink') || name.includes('nước giải khát');
+                        }
+                        return false;
+                      }) || driveFiles[0];
+
                       if (matchedFile) {
                         setSelectedFileId(matchedFile.id);
                         setSelectedFileName(matchedFile.name);
                         setCustomTopicName(selectedTopic);
-                        handleGenerateQuizzes();
+                        
+                        // Pass explicitly to bypass React state latency
+                        handleGenerateQuizzes(null, {
+                          fileId: matchedFile.id,
+                          fileName: matchedFile.name,
+                          topic: selectedTopic
+                        });
                       }
                     }} 
                     disabled={generating}
