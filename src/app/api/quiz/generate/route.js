@@ -29,7 +29,8 @@ export async function POST(request) {
     try {
       const { data: existingData, error: fetchErr } = await supabase
         .from('quizzes')
-        .select('question');
+        .select('question')
+        .eq('topic', topic);
       if (!fetchErr && existingData) {
         existingQuestions = existingData.map(q => q.question);
       }
