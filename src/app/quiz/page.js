@@ -2,19 +2,14 @@
 
 import { useState, useEffect } from 'react';
 
-// Default 10 topics proposed in the plan to display as initial blocks if database is clean
-const DEFAULT_TOPICS = [
-  'Thương Mại Điện Tử Việt Nam 2025 (Vietnam E-Commerce 2025)',
-  'Xu Hướng Hành Vi Người Tiêu Dùng Việt Nam 2025 (Vietnam Consumer Trends 2025)',
-  'Thị Trường Mỹ Phẩm & Chăm Sóc Da Việt Nam (Skincare & Cosmetics Market)',
-  'Xu Hướng Mua Sắm & Tăng Trưởng Thương Hiệu Tết 2026 (Vietnam Tet 2026 Insights)',
-  'Thị Trường Chuỗi Coffee Shop Tại Việt Nam (Vietnam Coffee Shop Chains H1/2025)',
-  'Thương Mại Mạng Xã Hội Tại Việt Nam (Vietnamese Social Commerce Behavior)',
-  'Ẩm Thực Đường Phố Việt Nam (Vietnam Street Food Culture & Business)',
-  'Thị Trường Bán Lẻ Dược Phẩm Việt Nam (Vietnam Pharmaceutical Retail)',
-  'Xu Hướng Thanh Toán Công Nghệ Việt Nam (Vietnam Paytech Trends)',
-  'Ngành Hàng Nước Giải Khát & Đồ Uống (Vietnam Beverage Market & Beer Industry)'
-];
+const cleanFileName = (name) => {
+  if (!name) return '';
+  return name
+    .replace(/^Copy of\s+/i, '')
+    .replace(/\.pdf$/i, '')
+    .replace(/_/g, ' ')
+    .replace(/-/g, ' ');
+};
 
 export default function QuizPage() {
   const [topics, setTopics] = useState([]);
@@ -31,32 +26,15 @@ export default function QuizPage() {
   // Form states for manual AI generation
   const [selectedFileId, setSelectedFileId] = useState('');
   const [selectedFileName, setSelectedFileName] = useState('');
-  const [customTopicName, setCustomTopicName] = useState(DEFAULT_TOPICS[0]);
 
-  // Fetch topics list
+  // Fetch topics (files) list
   const loadTopics = async () => {
     setLoadingTopics(true);
     try {
       const res = await fetch('/api/quiz/list');
       const json = await res.json();
       if (json.success) {
-        // Merge fetched topics with defaults to ensure all 10 are visible
-        const dbTopicsMap = {};
-        json.topics.forEach(t => { dbTopicsMap[t.name] = t.count; });
-        
-        const merged = DEFAULT_TOPICS.map(name => ({
-          name,
-          count: dbTopicsMap[name] || 0
-        }));
-
-        // Append any other topics from DB that aren't in default list
-        json.topics.forEach(t => {
-          if (!DEFAULT_TOPICS.includes(t.name)) {
-            merged.push({ name: t.name, count: t.count });
-          }
-        });
-
-        setTopics(merged);
+        setTopics(json.topics || []);
       }
     } catch (err) {
       console.error("Failed to load topics:", err);
@@ -136,7 +114,7 @@ export default function QuizPage() {
     
     const fileId = overrideParams ? overrideParams.fileId : selectedFileId;
     const fileName = overrideParams ? overrideParams.fileName : selectedFileName;
-    const topicName = overrideParams ? overrideParams.topic : customTopicName;
+    const topicName = fileName;
 
     if (!fileName) return;
 
@@ -148,14 +126,13 @@ export default function QuizPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          topic: topicName,
           fileName: fileName,
           fileId: fileId
         })
       });
       const json = await res.json();
       if (json.success) {
-        setFeedback(`✅ Đã tạo thành công ${json.quizzes.length} câu hỏi mới cho chủ đề!`);
+        setFeedback(`✅ Đã tạo thành công ${json.quizzes.length} câu hỏi mới cho file này!`);
         if (selectedTopic === topicName) {
           loadQuizzes(selectedTopic);
         } else {
@@ -250,42 +227,12 @@ export default function QuizPage() {
                     <option value="" disabled>-- Chọn báo cáo --</option>
                     {driveFiles.map(file => (
                       <option key={file.id} value={file.id}>
-                        {file.status === 'processed' ? '✅' : '⏳'} {file.name.replace('Copy of ', '')}
+                        {file.status === 'processed' ? '✅' : '⏳'} {cleanFileName(file.name)}
                       </option>
                     ))}
                   </select>
                 )}
               </div>
-
-              {/* Topic selection mapping */}
-              <div className="form-group">
-                <label className="form-label">Chủ đề gán cho Quiz:</label>
-                <select 
-                  className="form-select" 
-                  value={customTopicName} 
-                  onChange={(e) => setCustomTopicName(e.target.value)}
-                  required
-                >
-                  {DEFAULT_TOPICS.map((t, idx) => (
-                    <option key={idx} value={t}>{t}</option>
-                  ))}
-                  <option value="Khác">-- Tạo chủ đề mới (dựa theo tên file) --</option>
-                </select>
-              </div>
-
-              {customTopicName === 'Khác' && (
-                <div className="form-group">
-                  <label className="form-label">Nhập tên chủ đề mới:</label>
-                  <input 
-                    type="text" 
-                    className="form-input" 
-                    placeholder="Ví dụ: Xu hướng Thời trang 2026" 
-                    value={customTopicName === 'Khác' ? '' : customTopicName}
-                    onChange={(e) => setCustomTopicName(e.target.value)}
-                    required
-                  />
-                </div>
-              )}
 
               <button 
                 type="submit" 
@@ -304,9 +251,9 @@ export default function QuizPage() {
 
           {/* Bottom: Grid of existing Topics */}
           <div>
-            <h2 style={{ fontSize: '1.25rem', marginBottom: '20px' }}>📁 Danh Sách Chủ Đề Hiện Tại</h2>
+            <h2 style={{ fontSize: '1.25rem', marginBottom: '20px' }}>📁 Danh Sách File Báo Cáo & Câu Hỏi</h2>
             {loadingTopics ? (
-              <p style={{ color: 'var(--text-muted)' }}>Đang tải danh sách chủ đề...</p>
+              <p style={{ color: 'var(--text-muted)' }}>Đang tải danh sách file...</p>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
                 {topics.map((topic, index) => {
@@ -326,7 +273,7 @@ export default function QuizPage() {
                     >
                       <div>
                         <h3 style={{ fontSize: '1rem', fontWeight: '700', lineHeight: '1.4', marginBottom: '8px', color: topic.count > 0 ? 'var(--primary)' : 'var(--text-main)' }}>
-                          {topic.name}
+                          {cleanFileName(topic.name)}
                         </h3>
                         <span className={`badge ${topic.count > 0 ? 'badge-success' : 'badge-warning'}`} style={{ fontSize: '0.7rem' }}>
                           {topic.count > 0 ? `${topic.count} câu hỏi` : 'chưa có câu hỏi'}
@@ -353,8 +300,8 @@ export default function QuizPage() {
         <div style={{ marginTop: '48px', borderTop: '2px dashed rgba(0,0,0,0.1)', paddingTop: '32px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
             <div>
-              <h2 style={{ fontSize: '1.5rem', margin: 0, color: 'var(--text-main)' }}>📋 Chi tiết câu hỏi: {selectedTopic}</h2>
-              <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '4px' }}>Danh sách câu hỏi trắc nghiệm của chủ đề được tải chi tiết bên dưới.</p>
+              <h2 style={{ fontSize: '1.5rem', margin: 0, color: 'var(--text-main)' }}>📋 Chi tiết câu hỏi: {cleanFileName(selectedTopic)}</h2>
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '4px' }}>Danh sách câu hỏi trắc nghiệm của file báo cáo được tải chi tiết bên dưới.</p>
             </div>
             <button onClick={handleBack} className="btn btn-secondary" style={{ padding: '8px 16px', fontSize: '0.85rem' }}>
               ❌ Đóng / Ẩn danh sách
@@ -398,45 +345,11 @@ export default function QuizPage() {
                   <button 
                     onClick={() => {
                       // Find file for this topic
-                      const matchedFile = driveFiles.find(f => {
-                        const name = f.name.toLowerCase();
-                        if (selectedTopic.includes('Thương Mại Điện Tử') || selectedTopic.includes('E-Commerce')) {
-                          return name.includes('e-commerce') || name.includes('ecommerce') || name.includes('shopper');
-                        }
-                        if (selectedTopic.includes('Người Tiêu Dùng') || selectedTopic.includes('Consumer Trends')) {
-                          return name.includes('consumer trends') || name.includes('xu huong hanh vi') || name.includes('vads2025') || name.includes('vietnam consumer');
-                        }
-                        if (selectedTopic.includes('Mỹ Phẩm') || selectedTopic.includes('Skincare') || selectedTopic.includes('Cosmetics')) {
-                          return name.includes('skincare') || name.includes('my pham') || name.includes('hair care') || name.includes('beauty');
-                        }
-                        if (selectedTopic.includes('Tết')) {
-                          return name.includes('tết') || name.includes('tet') || name.includes('brand playbook');
-                        }
-                        if (selectedTopic.includes('Coffee')) {
-                          return name.includes('coffee') || name.includes('cà phê') || name.includes('chuỗi cửa hàng');
-                        }
-                        if (selectedTopic.includes('Mạng Xã Hội') || selectedTopic.includes('Social Commerce')) {
-                          return name.includes('social commerce') || name.includes('discovery & purchase');
-                        }
-                        if (selectedTopic.includes('Đường Phố') || selectedTopic.includes('Street Food')) {
-                          return name.includes('street food') || name.includes('am thuc duong pho');
-                        }
-                        if (selectedTopic.includes('Dược Phẩm') || selectedTopic.includes('Pharmacy')) {
-                          return name.includes('dược phẩm') || name.includes('retail pharmacy') || name.includes('pharmaceutical');
-                        }
-                        if (selectedTopic.includes('Thanh Toán') || selectedTopic.includes('Paytech')) {
-                          return name.includes('paytech') || name.includes('thanh toan') || name.includes('payment');
-                        }
-                        if (selectedTopic.includes('Nước Giải Khát') || selectedTopic.includes('Beverage') || selectedTopic.includes('Bia')) {
-                          return name.includes('beverage') || name.includes('bia') || name.includes('food-drink') || name.includes('nước giải khát');
-                        }
-                        return false;
-                      }) || driveFiles[0];
+                      const matchedFile = driveFiles.find(f => f.name === selectedTopic) || driveFiles[0];
 
                       if (matchedFile) {
                         setSelectedFileId(matchedFile.id);
                         setSelectedFileName(matchedFile.name);
-                        setCustomTopicName(selectedTopic);
                         
                         // Pass explicitly to bypass React state latency
                         handleGenerateQuizzes(null, {

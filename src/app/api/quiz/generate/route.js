@@ -10,13 +10,14 @@ export async function POST(request) {
   }
 
   try {
-    const { topic, fileName, fileId } = await request.json();
+    const { fileName, fileId } = await request.json();
+    const topic = fileName;
 
-    if (!topic || !fileName) {
-      return NextResponse.json({ error: 'Missing topic or fileName' }, { status: 400 });
+    if (!fileName) {
+      return NextResponse.json({ error: 'Missing fileName' }, { status: 400 });
     }
 
-    console.log(`Manually generating quizzes for topic: ${topic}, file: ${fileName}`);
+    console.log(`Manually generating quizzes for file: ${fileName}`);
 
     // Try downloading the file if fileId is a real Drive ID
     let fileBuffer = null;

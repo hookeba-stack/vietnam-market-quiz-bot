@@ -3,6 +3,14 @@
 import { useState, useEffect } from 'react';
 
 export default function SchedulePage() {
+  const cleanFileName = (name) => {
+    if (!name) return '';
+    return name
+      .replace(/^Copy of\s+/i, '')
+      .replace(/\.pdf$/i, '')
+      .replace(/_/g, ' ')
+      .replace(/-/g, ' ');
+  };
   const [schedules, setSchedules] = useState([]);
   const [topics, setTopics] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -166,16 +174,16 @@ export default function SchedulePage() {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Chủ đề trắc nghiệm:</label>
+                <label className="form-label">File báo cáo trắc nghiệm:</label>
                 <select 
                   className="form-select" 
                   value={selectedTopic}
                   onChange={(e) => setSelectedTopic(e.target.value)}
                   required
                 >
-                  <option value="__random__">🎲 Ngẫu nhiên (Tất cả chủ đề)</option>
+                  <option value="__random__">🎲 Ngẫu nhiên (Tất cả báo cáo)</option>
                   {topics.map((t, idx) => (
-                    <option key={idx} value={t.name}>{t.name} ({t.count} câu hỏi)</option>
+                    <option key={idx} value={t.name}>{cleanFileName(t.name)} ({t.count} câu hỏi)</option>
                   ))}
                 </select>
               </div>
@@ -243,7 +251,7 @@ export default function SchedulePage() {
                       <tr key={schedule.id}>
                         <td style={{ fontSize: '0.85rem', fontFamily: 'monospace', fontWeight: '600' }}>{schedule.chat_id}</td>
                         <td style={{ fontSize: '0.9rem', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {schedule.topic === '__random__' ? '🎲 Ngẫu nhiên' : schedule.topic}
+                          {schedule.topic === '__random__' ? '🎲 Ngẫu nhiên' : cleanFileName(schedule.topic)}
                         </td>
                         <td style={{ fontSize: '0.9rem', fontWeight: '600' }}>
                           {formatCronTime(schedule.cron_expression)}

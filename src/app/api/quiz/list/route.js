@@ -1,6 +1,7 @@
-// API Route to fetch quiz list or quiz topics
+// API Route to fetch quiz list or quiz topics grouped by report file
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { getDriveFiles } from '@/lib/gdrive';
 
 export async function GET(request) {
   if (!supabase) {
@@ -8,11 +9,11 @@ export async function GET(request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const topic = searchParams.get('topic');
+  const topic = searchParams.get('topic'); // Note: 'topic' here refers to the file name in the new model
 
   try {
     if (topic) {
-      // 1. Fetch detailed quizzes for a specific topic
+      // 1. Fetch detailed quizzes for a specific report file name
       const { data, error } = await supabase
         .from('quizzes')
         .select('*')
@@ -26,27 +27,31 @@ export async function GET(request) {
         quizzes: data || []
       });
     } else {
-      // 2. Fetch list of unique topics with question counts
+      // 2. Fetch all files from Drive to act as groups
+      const driveFiles = await getDriveFiles();
+
+      // 3. Fetch all quizzes in DB to calculate counts per file
       const { data, error } = await supabase
         .from('quizzes')
         .select('topic');
 
       if (error) throw error;
 
-      // Group and count topics
-      const topicCounts = {};
+      const fileCounts = {};
       data.forEach(item => {
-        topicCounts[item.topic] = (topicCounts[item.topic] || 0) + 1;
+        fileCounts[item.topic] = (fileCounts[item.topic] || 0) + 1;
       });
 
-      const uniqueTopics = Object.keys(topicCounts).map(name => ({
-        name,
-        count: topicCounts[name]
+      // 4. Merge Drive files with their counts
+      const uniqueFiles = driveFiles.map(file => ({
+        name: file.name,
+        count: fileCounts[file.name] || 0,
+        fileId: file.id
       }));
 
       return NextResponse.json({
         success: true,
-        topics: uniqueTopics
+        topics: uniqueFiles
       });
     }
   } catch (error) {
