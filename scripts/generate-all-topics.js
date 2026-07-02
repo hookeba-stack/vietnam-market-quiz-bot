@@ -146,8 +146,17 @@ Yêu cầu cho mỗi câu hỏi trắc nghiệm:
       "1-4_Vietnam_Digital_Landscape"
     ];
     
-    const fileIndex = parseInt(file.id.split('-')[1]) || 0;
-    const baseKey = mockKeys[fileIndex % mockKeys.length];
+    const name = file.name.toLowerCase();
+    let baseKey = "1-2_2025_E-Commerce_Trends"; // Default fallback
+    if (name.includes('digital_vietnam') || name.includes('digital vietnam') || name.includes('vads2025')) {
+      baseKey = "1-1_REPORT_DIGITAL_VIETNAM_2025";
+    } else if (name.includes('e-commerce') || name.includes('ecommerce') || name.includes('shopper')) {
+      baseKey = "1-2_2025_E-Commerce_Trends";
+    } else if (name.includes('beverage') || name.includes('beer') || name.includes('nước giải khát') || name.includes('food-drink') || name.includes('food_drink')) {
+      baseKey = "1-3_Beverage-Market";
+    } else if (name.includes('digital_landscape') || name.includes('digital landscape') || name.includes('anymind')) {
+      baseKey = "1-4_Vietnam_Digital_Landscape";
+    }
     const baseQuestions = mockQuizzesData[baseKey];
     
     const randomizeQuizOptions = (options, correctOption) => {

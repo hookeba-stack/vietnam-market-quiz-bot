@@ -123,7 +123,7 @@ ${exclusionInstruction}
     // Fallback: Generate mock quizzes so the application works even with an invalid/expired API key
     const name = (fileName || '').toLowerCase();
     
-    let baseQuestions = mockQuizzesData.default;
+    let baseQuestions = mockQuizzesData["1-2_2025_E-Commerce_Trends"];
     if (name.includes('digital_vietnam') || name.includes('digital vietnam') || name.includes('vads2025')) {
       baseQuestions = mockQuizzesData["1-1_REPORT_DIGITAL_VIETNAM_2025"];
     } else if (name.includes('e-commerce') || name.includes('ecommerce') || name.includes('shopper')) {
